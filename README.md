@@ -42,55 +42,32 @@
 
 ---
 **ОСНОВНІ РЕЗУЛЬТАТИ**
-Batch.size та linger.ms тестування
- 
-Конфігурація	Records/sec	Avg Latency (ms)	Використання
-16KB, 0ms	799.86	0.10	Real-time
-64KB, 0ms	799.85	0.07	Balanced
-256KB, 50ms	799.87	31.24	Batch
+<img src="img\table.png" alt="">
 
-Найкрачі результати:
-Max throughput: (практично однаково для всіх) ≈ 799.8 rec/sec
-Min latency: 64KB, 0ms → 0.07 ms
-Оптимальний баланс: 64KB, 0ms (мінімальні хвости p99/p99.9 при цілі 800 rec/s)
-Compression алгоритми
- 
-Алгоритми	Records/sec	Latency (ms)	Compression Ratio	Рекомендація
-none	799.86	0.09	~0%	Сценарії реального часу
-Lz4	799.85	0.25	~55-65%	Швидке стистення, кмпроміс
-Zstd	799.83	0.45	~65-75	Макс. Стистення (архів/звіт)
-
-Ключові висновки:
-Найкраще стиснення: zstd (≈65–75%) для цього варіанту.
-Найкраща performance (latency): none (≈0.09 ms).
-Оптимальний баланс: lz4 для повсякденного моніторингу (економія місця з малою латентністю).
-
-Партиціонування масштабованість
- 
-Партиція	Records/sec	Scaling Factor	Ефективність
-4	799.96	1.00х	baseline
-8	799.82	1.00х	обмежено
-12	799.82	1.00х	обмежено
-Оптимальна кількість: 8 партицій для аналітики за fuel_type (coal/gas/mixed).
 Real-time (онлайн моніторинг fuel_flow / steam_pressure, алерти кожні 10 с):
 •	batch.size=16KB, linger.ms=0, compression=none, partitions=8
 •	Латентність: <1 ms (avg ~0.10 ms, p99=1 ms) | Throughput: ≈800 rec/sec
 •	Використання: критичні алерти environmental monitoring (миттєва реакція на відхилення тиску/витрати палива)
+
 Batch обробка (оперативна аналітика/дашборди, економія трафіку):
 •	batch.size=64KB, linger.ms=10–20, compression=lz4, partitions=8
 •	Compression: ~55–65% економії | Throughput: >800 rec/sec 
 •	Використання: щохвилинні/щогодинні агрегати для fuel efficiency і compliance, прийнятна затримка з помітною економією місця
+
 Архівування (історія для звітності та аудитів):
 •	batch.size=256KB, linger.ms=50, compression=zstd, partitions=12
 •	Compression: ~65–75% економії | Storage optimization: ≈3× зменшення обсягу (ефективно для довгострокового зберігання)
 •	Використання: довготермінові логи fuel_flow/steam_pressure для environmental reporting (latency не критична)
 
+
 Головний trade-off для системи моніторингу ТЕС:
 •	Latency vs Compression/Storage.
 o	Малий batch + linger=0 + compression=none → мінімальна затримка (avg ~0.07–0.10 ms, p99≈1 ms при 800 rec/s), але без економії місця.
 o	Великий batch + linger=50 + compression=zstd → макс. економія сховища (~70%), але затримка зростає.
+
 Критичний параметр:
 •	Для реагування на екологічні відхилення (steam_pressure, fuel_flow) пріоритет — latency (першочергово p99/p99.9), а не стискання.
+
 Рекомендована стратегія:
 1.	Real-time шар: batch.size=64KB, linger.ms=0, compression=none або lz4, partitions=8, ключ = fuel_type. Дає низькі хвости і стабільні ~800 rec/s.
 2.	Near-real-time/Batch шар: batch.size=64KB, linger.ms=10–20, compression=lz4 
@@ -117,11 +94,16 @@ o	Великий batch + linger=50 + compression=zstd → макс. економ
 
 **ДОДАТКИ**
  
+ <img src="img\1.png" alt="">
+ 
 Генерація 1200 тестових записів, перевірка їх кількості, завантаження у топік thermal-main, далі успішний стрім 100 записів через pipe та показ перших 5 повідомлень споживачем.
 
+
+ <img src="img\2.png" alt="">
  
 Список топіків у кластері Kafka
- 
-Споживання з thermal-part-12 з відображенням партиції та ключа
+
+
+ <img src="img\3.png" alt="">
  
 Вивід усіх тестів, Batch/Linger, Compression, Partitions @ 2000 rec/s
