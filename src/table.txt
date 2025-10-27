@@ -1,0 +1,108 @@
+CREATE TABLE IF NOT EXISTS boilers_by_block (
+  block_id text,              -- напр
+  ts timestamp,               -- момент вимірювання
+  pressure_mpa double,        -- тиск пари
+  temperature_c double,       -- температура
+  fuel_flow_tph double,       -- витрата палива, т/год
+  fuel_type text,             -- "coal" | "gas" | "mixed"
+  region text,                -- "Donetsk" | "Kharkiv" ...
+  date date,                  -- календарна дата (для агрегацій/партицій)
+  PRIMARY KEY ((block_id), ts)
+) WITH CLUSTERING ORDER BY (ts DESC);
+
+
+
+CREATE TABLE IF NOT EXISTS turbines_by_block (
+  block_id text,
+  ts timestamp,
+  rpm int,                    -- оберти
+  power_mw double,            -- потужність МВт
+  load_pct double,            -- навантаження, %
+  PRIMARY KEY ((block_id), ts)
+) WITH CLUSTERING ORDER BY (ts DESC);
+
+
+-- A) за block_id (добре для швидкого перегляду історії конкретного блоку)
+CREATE TABLE IF NOT EXISTS emissions_by_block (
+  block_id text,
+  ts timestamp,
+  co2_gps double,   -- грам/сек
+  nox_gps double,
+  so2_gps double,
+  fuel_type text,
+  region text,
+  date date,
+  PRIMARY KEY ((block_id), ts)
+) WITH CLUSTERING ORDER BY (ts DESC);
+
+-- B) за fuel_type (зручно для екологічного моніторингу по типу палива)
+CREATE TABLE IF NOT EXISTS emissions_by_fuel (
+  fuel_type text,   -- "coal" | "gas" | "mixed"
+  ts timestamp,
+  block_id text,
+  co2_gps double,
+  nox_gps double,
+  so2_gps double,
+  region text,
+  date date,
+  PRIMARY KEY ((fuel_type), ts, block_id)
+) WITH CLUSTERING ORDER BY (ts DESC);
+
+-- C) за (region, date) (зручно для щоденних звітів по регіону)
+CREATE TABLE IF NOT EXISTS emissions_by_region_date (
+  region text,
+  date date,
+  ts timestamp,
+  block_id text,
+  fuel_type text,
+  co2_gps double,
+  nox_gps double,
+  so2_gps double,
+  PRIMARY KEY ((region, date), ts, block_id)
+) WITH CLUSTERING ORDER BY (ts DESC);
+
+
+
+CREATE TABLE IF NOT EXISTS env_summary_by_station_date (
+  station_id text,            -- напр. THERMAL_DN, THERMAL_KH ...
+  date date,
+  co2_total_t double,         -- сумарно за добу (тонни)
+  nox_total_t double,
+  so2_total_t double,
+  avg_fuel_flow_tph double,
+  PRIMARY KEY ((station_id, date))
+);
+
+
+
+
+-- дані
+INSERT INTO boilers_by_block (block_id, ts, pressure_mpa, temperature_c, fuel_flow_tph, fuel_type, region, date)
+VALUES ('THERMAL_DN_1', toTimestamp(now()), 24.8, 520.0, 18.5, 'coal', 'Donetsk', toDate(now()));
+
+INSERT INTO boilers_by_block (block_id, ts, pressure_mpa, temperature_c, fuel_flow_tph, fuel_type, region, date)
+VALUES ('THERMAL_KH_2', toTimestamp(now()), 25.3, 515.0, 16.9, 'gas', 'Kharkiv', toDate(now()));
+
+INSERT INTO turbines_by_block (block_id, ts, rpm, power_mw, load_pct)
+VALUES ('THERMAL_DN_1', toTimestamp(now()), 3000, 215.0, 72.0);
+
+INSERT INTO turbines_by_block (block_id, ts, rpm, power_mw, load_pct)
+VALUES ('THERMAL_KH_2', toTimestamp(now()), 3000, 228.5, 76.0);
+
+-- додай ще пару точок у часі для кожного блоку, щоб було що усереднювати
+INSERT INTO turbines_by_block (block_id, ts, rpm, power_mw, load_pct)
+VALUES ('THERMAL_DN_1', dateOf(now()) - 600000, 2990, 210.0, 70.0);  -- ~10 хв тому
+
+INSERT INTO turbines_by_block (block_id, ts, rpm, power_mw, load_pct)
+VALUES ('THERMAL_KH_2', dateOf(now()) - 600000, 3005, 232.0, 77.0);
+
+-- emissions у трьох таблицях (одна й та сама логіка, різні ключі)
+INSERT INTO emissions_by_block (block_id, ts, co2_gps, nox_gps, so2_gps, fuel_type, region, date)
+VALUES ('THERMAL_DN_1', toTimestamp(now()), 950.0, 4.2, 1.1, 'coal', 'Donetsk', toDate(now()));
+
+INSERT INTO emissions_by_fuel (fuel_type, ts, block_id, co2_gps, nox_gps, so2_gps, region, date)
+VALUES ('coal', toTimestamp(now()), 'THERMAL_DN_1', 950.0, 4.2, 1.1, 'Donetsk', toDate(now()));
+
+INSERT INTO emissions_by_region_date (region, date, ts, block_id, fuel_type, co2_gps, nox_gps, so2_gps)
+VALUES ('Donetsk', toDate(now()), toTimestamp(now()), 'THERMAL_DN_1', 'coal', 950.0, 4.2, 1.1);
+
