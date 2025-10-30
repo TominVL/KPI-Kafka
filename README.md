@@ -130,7 +130,7 @@ AVG було взято з TRAICING ON середнє із 10 запитів, а
   <img src="img/4.png"><br>
 Рисунок 4 – після запуску bash-скрипта(nano run_latency_suite) виводиться акуратна табличка з затримками для трьох схем (Simple, Hourly, Daily) і трьох типів запитів (остання година, 6 годин, добова агрегація).
 
-  <img src="5.png"><br>
+  <img src="img/5.png"><br>
 Рисунок 5 - вимірювання середньої латентності запиту без матеріалізованого подання
   
   <img src="img/6.png"><br>
@@ -138,7 +138,7 @@ AVG було взято з TRAICING ON середнє із 10 запитів, а
 
 Також додані файли
 
-nano run_latency_suite.sh 
+nano run_latency_suite.sh <br>
 gen_var.py
 
 
