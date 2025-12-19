@@ -1,0 +1,44 @@
+groups:
+- name: emissions_alerts
+  interval: 30s
+  rules:
+
+  # 1) Перевищення нормативу 1 годину
+  - alert: EmissionLimitExceeded_1h
+    expr: tes_emission_tph > on(pollutant) group_left LIMITS_PLACEHOLDER
+    for: 1m
+    labels:
+      severity: critical
+    annotations:
+      summary: "Перевищення нормативу викидів > 1 годину"
+      description: "Station={{ $labels.station }}, fuel={{ $labels.fuel }}, pollutant={{ $labels.pollutant }}, value={{ $value }} т/год"
+
+  # 2) Відмова системи очистки: ефективність <85%
+  - alert: FilterEfficiencyLow
+    expr: tes_filter_efficiency_percent < 85
+    for: 5m
+    labels:
+      severity: critical
+    annotations:
+      summary: "Ефективність очистки <85%"
+      description: "Station={{ $labels.station }}, fuel={{ $labels.fuel }}, pollutant={{ $labels.pollutant }}, eff={{ $value }}%"
+
+  # 3) Високі SO2 (кисле паливо: coal/mazut)
+  - alert: HighSO2_AcidFuel
+    expr: tes_emission_tph{pollutant="so2", fuel=~"coal|mazut"} > 0.25
+    for: 10m
+    labels:
+      severity: warning
+    annotations:
+      summary: "Високі викиди SO2 на кислому паливі"
+      description: "Station={{ $labels.station }}, fuel={{ $labels.fuel }}, SO2={{ $value }} т/год"
+
+  # 4) Ризик штрафів
+  - alert: FineRisk
+    expr: tes_fine_uah_per_h > 0
+    for: 15m
+    labels:
+      severity: warning
+    annotations:
+      summary: "Є ризик еко-штрафів"
+      description: "Station={{ $labels.station }}, fuel={{ $labels.fuel }}, pollutant={{ $labels.pollutant }}, fine={{ $value }} грн/год"
